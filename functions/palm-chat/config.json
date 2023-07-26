@@ -4,5 +4,14 @@
   "max_output_tokens": 256,
   "top_p": 0.8,
   "top_k": 40,
-  "input_output_pairs": []
+  "input_output_pairs": [
+    {
+      "input": "Whats your first input text?",
+      "output": "Whats your first output text?"
+    },
+    {
+      "input": "Whats your first input text?",
+      "output": "Whats your first output text?"
+    }
+  ]
 }

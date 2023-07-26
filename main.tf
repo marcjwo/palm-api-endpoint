@@ -14,14 +14,34 @@
 * limitations under the License.
 */
 
+locals {
+  apis_to_activate = [
+    "run",
+    "aiplatform"
+  ]
+}
+
+resource "google_project_service" "apis_to_activate" {
+  for_each           = toset(local.apis_to_activate)
+  project            = var.project_id
+  service            = "${each.key}.googleapis.com"
+  disable_on_destroy = false
+  # disable_dependent_services = true
+  timeouts {
+    create = "10m"
+    update = "40m"
+  }
+}
+
 module "cf_service_account" {
   source      = "./modules/service_account"
   project_id  = var.project_id
-  account_id  = "cf-sa"
+  account_id  = "cloud-function-serviceaccount"
   description = "Service account for cloud function"
   service_account_roles = [
-    "roles/ml.modelUser"
+    "roles/aiplatform.user"
   ]
+  depends_on = [google_project_service.apis_to_activate]
 }
 
 resource "random_id" "default" {
@@ -29,21 +49,24 @@ resource "random_id" "default" {
 }
 
 resource "google_storage_bucket" "default" {
-  name                        = "${random_id.default.hex}-gcf-source"
-  location                    = var.region
-  uniform_bucket_level_access = true
+  name     = "${random_id.default.hex}-gcf-source"
+  location = var.region
+  # uniform_bucket_level_access = true
+  depends_on = [google_project_service.apis_to_activate]
 }
 
 data "archive_file" "default" {
   type        = "zip"
   output_path = "/tmp/function-source.zip"
   source_dir  = "functions/palm-chat/"
+  depends_on  = [google_project_service.apis_to_activate]
 }
 
 resource "google_storage_bucket_object" "object" {
-  name   = "function-source.zip"
-  bucket = google_storage_bucket.default.name
-  source = data.archive_file.default.output_path
+  name       = "function-source.zip"
+  bucket     = google_storage_bucket.default.name
+  source     = data.archive_file.default.output_path
+  depends_on = [google_project_service.apis_to_activate]
 }
 
 resource "google_cloudfunctions2_function" "default" {
@@ -68,20 +91,22 @@ resource "google_cloudfunctions2_function" "default" {
     timeout_seconds    = 60
     environment_variables = {
       PROJECT_ID = var.project_id
-      LOCATION   = var.region
+      LOCATION   = "us-central1" ## this has to be us-central1 as of now, because PaLM is not available in another region yet.
     }
-    service_account_email = google_service_account.account.email
+    service_account_email = module.cf_service_account.email
   }
+  depends_on = [google_project_service.apis_to_activate]
 }
 
 resource "google_cloud_run_service_iam_member" "cloud_run_invoker" {
-  project  = google_cloudfunctions2_function.function.project
-  location = google_cloudfunctions2_function.function.location
-  service  = google_cloudfunctions2_function.function.name
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${module.cf_service_account.email}"
+  project    = google_cloudfunctions2_function.default.project
+  location   = google_cloudfunctions2_function.default.location
+  service    = google_cloudfunctions2_function.default.name
+  role       = "roles/run.invoker"
+  member     = "serviceAccount:${module.cf_service_account.email}"
+  depends_on = [google_project_service.apis_to_activate]
 }
 
-output "function_uri" {
-  value = google_cloudfunctions2_function.default.service_config[0].uri
+output "function_endpoint" {
+  value = google_cloudfunctions2_function.default.url
 }

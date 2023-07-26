@@ -18,19 +18,3 @@ provider "google" {
   project = var.project_id
   region  = var.region
 }
-
-resource "random_id" "default" {
-  byte_length = 8
-}
-
-resource "google_storage_bucket" "default" {
-  name                        = "${random_id.default.hex}-gcf-source" # Every bucket name must be globally unique
-  location                    = var.region
-  uniform_bucket_level_access = true
-}
-
-data "archive_file" "default" {
-  type        = "zip"
-  output_path = "/tmp/function-source.zip"
-  source_dir  = "functions/hello-world/"
-}
