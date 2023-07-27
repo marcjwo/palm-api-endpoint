@@ -16,8 +16,10 @@
 
 locals {
   apis_to_activate = [
+    "cloudfunctions",
     "run",
-    "aiplatform"
+    "aiplatform",
+    "artifactregistry"
   ]
 }
 
@@ -39,7 +41,8 @@ module "cf_service_account" {
   account_id  = "cloud-function-serviceaccount"
   description = "Service account for cloud function"
   service_account_roles = [
-    "roles/aiplatform.user"
+    "roles/aiplatform.user",
+    "roles/artifactregistry.reader"
   ]
   depends_on = [google_project_service.apis_to_activate]
 }

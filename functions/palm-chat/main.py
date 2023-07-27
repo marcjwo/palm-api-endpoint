@@ -12,40 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functions_framework
-import vertexai
-import json
-import os
-from vertexai.preview.language_models import ChatModel, InputOutputTextPair
-
-with open("config.json", "r") as config_file:
-    config = json.load(config_file)
+import functions_framework, vertexai, json, os
+from vertexai.preview.language_models import ChatModel
 
 
-class InputOutputTextPair:
-    def __init__(self, input_text, output_text):
-        self.input_text = input_text
-        self.output_text = output_text
+def load_config():
+    with open("config.json", "r") as config_file:
+        return json.load(config_file)
 
 
-context = config["context"]
-input_output_pairs = config["input_output_pairs"]
-temperature = config["temperature"]
-max_output_tokens = config["max_output_tokens"]
-top_p = config["top_p"]
-top_k = config["top_k"]
-examples = [
-    InputOutputTextPair(pair["input"], pair["output"]) for pair in input_output_pairs
-]
-project_id = os.environ.get("PROJECT_ID")
-location = os.environ.get("LOCATION")
+def initialize_parameters(config):
+    context = config["context"]
+    input_output_pairs = config["input_output_pairs"]
+    temperature = config["temperature"]
+    max_output_tokens = config["max_output_tokens"]
+    top_p = config["top_p"]
+    top_k = config["top_k"]
+    examples = [
+        vertexai.preview.language_models.InputOutputTextPair(pair["input"], pair["output"]) for pair in input_output_pairs
+    ]
+    project_id = os.environ.get("PROJECT_ID")
+    location = os.environ.get("LOCATION")
+    return context, examples, temperature, max_output_tokens, top_p, top_k, project_id, location
 
+
+def initialize_chat_model():
+    return ChatModel.from_pretrained("chat-bison@001")
+
+
+config = load_config()
+context, examples, temperature, max_output_tokens, top_p, top_k, project_id, location = initialize_parameters(config)
+chat_model = initialize_chat_model()
 
 @functions_framework.http
 def process_request(request):
     request_json = request.get_json(silent=True)
-    vertexai.init(project=project_id, location=location)
-    chat_model = ChatModel.from_pretrained("chat-bison@001")
     parameters = {
         "temperature": temperature,
         "max_output_tokens": max_output_tokens,
